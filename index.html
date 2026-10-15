@@ -8,20 +8,21 @@
 <style>
   :root {
     color-scheme: dark;
-    --bg: #10121d;
-    --panel: #191d2e;
-    --panel-2: #222742;
-    --line: #394065;
-    --text: #f4f6ff;
-    --muted: #a8afce;
+    --bg: #111632;
+    --panel: #1c2450;
+    --panel-deep: #151b3f;
+    --line: #5560a8;
+    --text: #ffffff;
+    --muted: #c9d1ff;
     --accent: #ffd166;
-    --danger: #ff6b6b;
+    --accent-ink: #251c00;
+    --danger: #ff5f7a;
     font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; }
   body {
-    background: radial-gradient(circle at 20% 0%, #27304d 0%, var(--bg) 45%) no-repeat, var(--bg);
+    background: var(--bg);
     color: var(--text);
     display: flex;
     flex-direction: column;
@@ -39,20 +40,19 @@
   h1 {
     margin: 0;
     font-size: clamp(20px, 5vw, 27px);
+    font-weight: 900;
     letter-spacing: 1px;
-    background: linear-gradient(90deg, #ffd166, #ef476f, #06d6a0);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: #ffd166;
+    text-shadow: 2px 2px 0 #e5397a;
     white-space: nowrap;
   }
   .stats { display: flex; gap: 7px; }
   .score-box {
     min-width: 70px;
     padding: 6px 9px;
-    border: 1px solid var(--line);
+    border: 2px solid var(--line);
     border-radius: 10px;
-    background: #151929cc;
+    background: var(--panel-deep);
     text-align: center;
   }
   .score-box span { display: block; color: var(--muted); font-size: 10px; }
@@ -60,18 +60,13 @@
   main {
     width: min(100%, 480px);
     display: grid;
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 86px 1fr;
     gap: 8px;
   }
-  .side {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: center;
-  }
+  .side { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
   .next {
     padding: 8px 6px;
-    border: 1px solid var(--line);
+    border: 2px solid var(--line);
     border-radius: 12px;
     background: var(--panel);
     text-align: center;
@@ -80,44 +75,62 @@
   .ball-preview {
     width: 44px;
     height: 44px;
+    border: 3px solid #1e2350;
     border-radius: 50%;
     display: grid;
     place-items: center;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 15px;
     margin: auto;
-    box-shadow: inset -3px -5px 10px #0003;
   }
+  .quality {
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 7px;
+  }
+  .quality legend { font-size: 10px; color: var(--muted); padding: 0 3px; }
+  .quality-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
   button {
-    border: 0;
+    border: 2px solid #1e2350;
     border-radius: 10px;
-    padding: 9px 8px;
-    color: #191f33;
+    padding: 8px 6px;
+    color: var(--accent-ink);
     font: inherit;
-    font-size: 13px;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 900;
     cursor: pointer;
     background: var(--accent);
     width: 100%;
   }
   button:active { transform: translateY(1px); }
+  .quality-controls button {
+    padding: 5px 2px;
+    font-size: 11px;
+    color: #dfe5ff;
+    background: var(--panel-deep);
+    border-color: #3c4680;
+  }
+  .quality-controls button[aria-pressed="true"] {
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-color: #1e2350;
+  }
   .help {
-    padding: 9px 7px;
-    border: 1px dashed var(--line);
+    padding: 8px 7px;
+    border: 2px dashed var(--line);
     border-radius: 12px;
     color: var(--muted);
     font-size: 10px;
     line-height: 1.6;
-    text-align: left;
-    background: #151929aa;
+    background: var(--panel-deep);
   }
   .stage-shell {
     position: relative;
-    border: 2px solid var(--line);
+    border: 4px solid #1e2350;
     border-radius: 16px;
-    background: linear-gradient(180deg, #171b2c, #121624);
+    background: #fffdf4;
     overflow: hidden;
-    box-shadow: 0 18px 45px #0007;
   }
   canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
   .overlay {
@@ -125,16 +138,16 @@
     inset: 0;
     display: grid;
     place-content: center;
-    gap: 14px;
+    gap: 13px;
     text-align: center;
     padding: 20px;
-    background: #0b0d16dd;
-    backdrop-filter: blur(3px);
+    background: #fffdf4ee;
+    color: #1e2350;
   }
   .overlay[hidden] { display: none; }
-  .overlay h2 { margin: 0; font-size: 26px; }
-  .overlay p { margin: -5px 0 0; color: var(--muted); }
-  .overlay strong { color: var(--accent); }
+  .overlay h2 { margin: 0; font-size: 26px; color: #e5397a; }
+  .overlay p { margin: -5px 0 0; color: #48518a; }
+  .overlay strong { color: #d81159; }
   .chain {
     width: min(100%, 480px);
     margin-top: 10px;
@@ -149,24 +162,25 @@
   }
   .chain div {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
+    width: 29px;
+    height: 29px;
+    border: 2px solid #1e2350;
     border-radius: 50%;
     display: grid;
     place-items: center;
-    color: #172033;
+    color: #1e2350;
     font-weight: 900;
-    font-size: 10px;
-    box-shadow: inset -2px -3px 6px #0003;
+    font-size: 9px;
   }
   .chain i { flex: 0 0 auto; font-style: normal; }
-  footer { margin-top: 8px; color: #6f779b; font-size: 10px; text-align: center; }
+  footer { margin-top: 8px; color: #9aa4e0; font-size: 10px; text-align: center; }
   @media (max-width: 400px) {
     main { grid-template-columns: 1fr; }
-    .side { flex-direction: row; align-items: stretch; }
-    .next { flex: 1; }
+    .side { grid-template-columns: 1fr 1fr; display: grid; }
+    .next { grid-column: span 2; }
+    .quality, .help { grid-column: span 2; }
     .help { display: none; }
-    button { width: 100px; }
+    button { width: 100%; }
   }
 </style>
 </head>
@@ -185,6 +199,14 @@
       <span>下一颗</span><div id="nextBall" class="ball-preview" aria-hidden="true"></div>
     </div>
     <button id="restart" type="button">重开</button>
+    <fieldset class="quality">
+      <legend>画面质量</legend>
+      <div class="quality-controls" id="qualityControls" role="group" aria-label="画面质量">
+        <button type="button" data-quality="low" aria-pressed="false">流畅</button>
+        <button type="button" data-quality="medium" aria-pressed="false">标准</button>
+        <button type="button" data-quality="high" aria-pressed="false">精细</button>
+      </div>
+    </fieldset>
     <div class="help">
       鼠标移动瞄准<br>点击 / 下键投放<br>← → 微调位置<br>相同球相碰合成
     </div>
@@ -213,6 +235,7 @@
   const nextEl = document.getElementById("nextBall");
   const overlay = document.getElementById("overlay");
   const finalScore = document.getElementById("finalScore");
+  const qualityControls = document.getElementById("qualityControls");
 
   const W = 480, H = 720;
   const LEFT = 18, RIGHT = W - 18, FLOOR = H - 22;
@@ -235,7 +258,9 @@
     { label: "ZT", radius: 95, color: "#00b4d8", score: 60 },
   ];
 
+  const QUALITY_SCALE = { low: 1, medium: 1.5, high: 2 };
   const state = {
+    quality: localStorage.getItem("synthesis-world-coach-quality") || "high",
     balls: [],
     aimX: W / 2,
     current: randomTier(),
@@ -248,6 +273,24 @@
     elapsed: 0,
     pops: []
   };
+
+  function configureCanvasQuality() {
+    if (!Object.hasOwn(QUALITY_SCALE, state.quality)) state.quality = "high";
+    const scale = QUALITY_SCALE[state.quality];
+    canvas.width = Math.round(W * scale);
+    canvas.height = Math.round(H * scale);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    for (const button of qualityControls.querySelectorAll("button")) {
+      button.setAttribute("aria-pressed", String(button.dataset.quality === state.quality));
+    }
+  }
+
+  function setQuality(quality) {
+    if (!Object.hasOwn(QUALITY_SCALE, quality)) return;
+    state.quality = quality;
+    localStorage.setItem("synthesis-world-coach-quality", quality);
+    configureCanvasQuality();
+  }
 
   function randomTier() {
     const total = DROP_POOL.reduce((sum, item) => sum + item.weight, 0);
@@ -271,6 +314,7 @@
     state.elapsed = 0;
     overlay.hidden = true;
     syncHud();
+    configureCanvasQuality();
   }
 
   function syncHud() {
@@ -340,7 +384,8 @@
 
         if (a.tier === b.tier && a.tier < TIERS.length-1) {
           const spec = TIERS[a.tier+1];
-          const massA = a.r*a.r, massB = b.r*b.r;
+          // Three-dimensional spherical mass is proportional to radius cubed.
+          const massA = a.r*a.r*a.r, massB = b.r*b.r*b.r;
           const x = (a.x*massA+b.x*massB)/(massA+massB);
           const y = (a.y*massA+b.y*massB)/(massA+massB);
           state.balls = state.balls.filter((_, k) => k !== i && k !== j);
@@ -357,7 +402,7 @@
 
         const nx=dx/dist, ny=dy/dist;
         const overlap=minDist-dist;
-        const ma=a.r*a.r, mb=b.r*b.r, total=ma+mb;
+        const ma=a.r*a.r*a.r, mb=b.r*b.r*b.r, total=ma+mb;
         a.x -= nx*overlap*(mb/total)*0.55;
         a.y -= ny*overlap*(mb/total)*0.55;
         b.x += nx*overlap*(ma/total)*0.55;
@@ -365,11 +410,11 @@
         const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
         const sep=rvx*nx+rvy*ny;
         if (sep < 0) {
-          const e=0.14;
+          // Elastic impulse: equal and opposite momentum changes in a 3-D mass model.
+          const e=1;
           const jimp=-(1+e)*sep/(1/ma+1/mb);
           a.vx -= jimp*nx/ma; a.vy -= jimp*ny/ma;
           b.vx += jimp*nx/mb; b.vy += jimp*ny/mb;
-          a.vx *= 0.995; b.vx *= 0.995;
         }
       }
     }
@@ -406,52 +451,85 @@
   function drawBallShape(x,y,r,color,label,alpha=1) {
     ctx.save();
     ctx.globalAlpha=alpha;
-    const grad=ctx.createRadialGradient(x-r*.38,y-r*.45,r*.12,x,y,r);
-    grad.addColorStop(0,"rgba(255,255,255,.72)");
-    grad.addColorStop(.22,color);
-    grad.addColorStop(1,"rgba(0,0,0,.28)");
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fillStyle=grad; ctx.fill();
-    ctx.lineWidth=Math.max(2,r*.055);
-    ctx.strokeStyle="rgba(255,255,255,.32)"; ctx.stroke();
-    ctx.shadowColor="rgba(0,0,0,.35)"; ctx.shadowBlur=8; ctx.shadowOffsetY=3;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=color;
+    ctx.fill();
+    ctx.lineWidth=Math.max(2.5,r*.075);
+    ctx.strokeStyle="#1e2350";
+    ctx.stroke();
+
+    // Flat anime-style highlight and cheek accents.
+    ctx.beginPath();
+    ctx.arc(x-r*.30,y-r*.34,r*.22,0,Math.PI*2);
+    ctx.fillStyle="rgba(255,255,255,.88)";
+    ctx.fill();
+    if (state.quality !== "low" && r >= 25) {
+      ctx.beginPath(); ctx.ellipse(x-r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
+      ctx.ellipse(x+r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
+      ctx.fillStyle="rgba(255,94,141,.55)"; ctx.fill();
+    }
+
     ctx.fillStyle=readableColor(color);
-    ctx.font=`900 ${Math.max(11,r*(label.length>3?.30:.58))}px system-ui, sans-serif`;
+    ctx.font=`900 ${Math.max(11,r*(label.length>3?.30:.55))}px system-ui, sans-serif`;
     ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.lineWidth=Math.max(2,r*.035);
+    ctx.strokeStyle="rgba(30,35,80,.28)";
+    ctx.strokeText(label,x,y+r*.03);
     ctx.fillText(label,x,y+r*.03);
     ctx.restore();
   }
 
   function draw() {
     ctx.clearRect(0,0,W,H);
-    const bg=ctx.createLinearGradient(0,0,0,H);
-    bg.addColorStop(0,"#202641"); bg.addColorStop(1,"#141726");
-    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#fffdf4";
+    ctx.fillRect(0,0,W,H);
 
-    ctx.strokeStyle="#394065"; ctx.lineWidth=3;
+    if (state.quality === "high") {
+      ctx.strokeStyle="rgba(85,96,168,.10)";
+      ctx.lineWidth=1;
+      for (let x=LEFT+30; x<RIGHT; x+=30) {
+        ctx.beginPath(); ctx.moveTo(x,DANGER_Y); ctx.lineTo(x,FLOOR); ctx.stroke();
+      }
+      for (let y=DANGER_Y+30; y<FLOOR; y+=30) {
+        ctx.beginPath(); ctx.moveTo(LEFT,y); ctx.lineTo(RIGHT,y); ctx.stroke();
+      }
+      ctx.fillStyle="#ffe1ef";
+      ctx.beginPath(); ctx.arc(RIGHT-60,DANGER_Y+40,30,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(RIGHT-28,DANGER_Y+50,23,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(RIGHT-74,DANGER_Y+58,20,0,Math.PI*2); ctx.fill();
+    }
+
+    ctx.strokeStyle="#1e2350";
+    ctx.lineWidth=5;
     ctx.beginPath(); ctx.moveTo(LEFT,FLOOR+8); ctx.lineTo(LEFT,DANGER_Y-18); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(RIGHT,FLOOR+8); ctx.lineTo(RIGHT,DANGER_Y-18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(LEFT,FLOOR+6); ctx.lineTo(RIGHT,FLOOR+6); ctx.stroke();
 
-    ctx.strokeStyle="rgba(255,107,107,.62)";
-    ctx.setLineDash([9,9]); ctx.lineWidth=2;
+    ctx.strokeStyle="#ff5f7a";
+    ctx.setLineDash([10,8]); ctx.lineWidth=3;
     ctx.beginPath(); ctx.moveTo(LEFT,DANGER_Y); ctx.lineTo(RIGHT,DANGER_Y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle="rgba(255,107,107,.72)";
-    ctx.font="700 11px system-ui,sans-serif";
-    ctx.fillText("危险线",LEFT+5,DANGER_Y-7);
+    ctx.fillStyle="#d81159";
+    ctx.font="900 11px system-ui,sans-serif";
+    ctx.fillText("危险线",LEFT+5,DANGER_Y-8);
 
     if (state.running && state.canDrop) drawGuide();
     for (const b of state.balls) drawBallShape(b.x,b.y,b.r,TIERS[b.tier].color,TIERS[b.tier].label);
 
+    if (state.quality === "low") return;
     for (const p of state.pops) {
       const t=p.age/.48;
       ctx.save();
       ctx.globalAlpha=1-t;
-      ctx.strokeStyle="#fff";
-      ctx.lineWidth=4*(1-t)+1;
+      ctx.strokeStyle="#d81159";
+      ctx.lineWidth=5*(1-t)+1;
       ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(.6+t*.7),0,Math.PI*2); ctx.stroke();
-      ctx.fillStyle="#fff";
-      ctx.font="800 16px system-ui,sans-serif"; ctx.textAlign="center";
+      ctx.strokeStyle="#1e2350";
+      ctx.lineWidth=1;
+      ctx.stroke();
+      ctx.fillStyle="#1e2350";
+      ctx.font="900 16px system-ui,sans-serif"; ctx.textAlign="center";
       ctx.fillText(p.text,p.x,p.y-p.r*(.7+t*.6));
       ctx.restore();
     }
@@ -488,6 +566,10 @@
     if (event.key === "ArrowLeft") { state.aimX -= 20; event.preventDefault(); }
     if (event.key === "ArrowRight") { state.aimX += 20; event.preventDefault(); }
     if (event.key === "ArrowDown" || event.key === " ") { drop(); event.preventDefault(); }
+  });
+  qualityControls.addEventListener("click", event => {
+    const button=event.target.closest("button[data-quality]");
+    if (button) setQuality(button.dataset.quality);
   });
   document.getElementById("restart").addEventListener("click", reset);
   document.getElementById("overlayRestart").addEventListener("click", reset);
