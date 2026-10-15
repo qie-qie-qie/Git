@@ -237,6 +237,7 @@
   const tierImages = {
     AJYC: Object.assign(new Image(), { src: "assets/AJYC.png" }),
     ZT: Object.assign(new Image(), { src: "assets/ZT.png" }),
+    "2班": Object.assign(new Image(), { src: "assets/2班.png" }),
   };
   const qualityControls = document.getElementById("qualityControls");
 
@@ -259,6 +260,7 @@
     { label: "蛋", radius: 64, color: "#b5838d", score: 24 },
     { label: "AJYC", radius: 79, color: "#7b2cbf", score: 36 },
     { label: "ZT", radius: 95, color: "#00b4d8", score: 60 },
+    { label: "2班", radius: 112, color: "#ffb703", score: 100 },
   ];
 
   const QUALITY_SCALE = { low: 1, medium: 1.5, high: 2 };
@@ -274,7 +276,9 @@
     canDrop: true,
     dangerTime: 0,
     elapsed: 0,
-    pops: []
+    pops: [],
+    messages: [],
+    fireworks: []
   };
 
   function configureCanvasQuality() {
@@ -308,6 +312,8 @@
   function reset() {
     state.balls = [];
     state.pops = [];
+    state.messages = [];
+    state.fireworks = [];
     state.score = 0;
     state.current = randomTier();
     state.next = randomTier();
@@ -360,66 +366,218 @@
     syncHud();
   }
 
+  function clampBallToWorld(ball) {
+    ball.x = Math.min(RIGHT-ball.r, Math.max(LEFT+ball.r, ball.x));
+    ball.y = Math.min(FLOOR-ball.r, ball.y);
+  }
+
+  function mergeBalls(a, b, indexA, indexB) {
+    const spec = TIERS[a.tier + 1];
+    // Three-dimensional spherical mass is proportional to radius cubed.
+    const massA = a.r*a.r*a.r, massB = b.r*b.r*b.r;
+    const x = (a.x*massA+b.x*massB)/(massA+massB);
+    const y = (a.y*massA+b.y*massB)/(massA+massB);
+    state.balls = state.balls.filter((_, index) => index !== indexA && index !== indexB);
+    state.score += TIERS[a.tier].score + spec.score;
+    if (state.score > state.best) {
+      state.best = state.score;
+      localStorage.setItem("synthesis-world-coach-best", String(state.best));
+    }
+    state.pops.push({x, y, r: spec.radius, tier: a.tier + 1, age: 0, text: spec.label});
+    const spawned = {
+      tier: a.tier + 1, x, y, vx: 0, vy: 0,
+      r: spec.radius, born: state.elapsed, age: 0.12
+    };
+    state.balls.push(spawned);
+    clampBallToWorld(spawned);
+    startCelebration(a.tier + 1, x, y);
+    syncHud();
+  }
+
   function physics(dt) {
     const g = 1650;
     const damping = Math.pow(0.21, dt);
-    for (const b of state.balls) {
-      b.vy += g*dt;
-      b.vx *= damping;
-      b.x += b.vx*dt;
-      b.y += b.vy*dt;
-      b.age += dt;
-      if (b.x-b.r < LEFT) { b.x = LEFT+b.r; b.vx = Math.abs(b.vx)*0.16; }
-      if (b.x+b.r > RIGHT) { b.x = RIGHT-b.r; b.vx = -Math.abs(b.vx)*0.16; }
-      if (b.y+b.r > FLOOR) { b.y = FLOOR-b.r; b.vy = -Math.abs(b.vy)*0.06; b.vx *= 0.94; }
+    for (const ball of state.balls) {
+      ball.vy += g*dt;
+      ball.vx *= damping;
+      ball.x += ball.vx*dt;
+      ball.y += ball.vy*dt;
+      ball.age += dt;
+      clampBallToWorld(ball);
+      if (ball.x-ball.r <= LEFT) ball.vx = Math.abs(ball.vx)*0.16;
+      if (ball.x+ball.r >= RIGHT) ball.vx = -Math.abs(ball.vx)*0.16;
+      if (ball.y+ball.r >= FLOOR) {
+        ball.vy = -Math.abs(ball.vy)*0.06;
+        ball.vx *= 0.94;
+      }
     }
 
-    const merged = new Set();
-    for (let i=0; i<state.balls.length; i++) {
-      if (merged.has(i)) continue;
-      for (let j=i+1; j<state.balls.length; j++) {
-        if (merged.has(i) || merged.has(j)) continue;
-        const a = state.balls[i], b = state.balls[j];
-        const dx = b.x-a.x, dy = b.y-a.y;
-        const dist = Math.hypot(dx,dy) || 0.001;
-        const minDist = a.r+b.r;
-        if (dist >= minDist) continue;
+    // Multiple relaxation passes keep dense stacks from visually overlapping.
+    // Each pass fully separates a colliding pair according to inverse mass.
+    for (let pass=0; pass<8; pass++) {
+      let collided = false;
+      let mergedThisPass = false;
 
-        if (a.tier === b.tier && a.tier < TIERS.length-1) {
-          const spec = TIERS[a.tier+1];
-          // Three-dimensional spherical mass is proportional to radius cubed.
-          const massA = a.r*a.r*a.r, massB = b.r*b.r*b.r;
-          const x = (a.x*massA+b.x*massB)/(massA+massB);
-          const y = (a.y*massA+b.y*massB)/(massA+massB);
-          state.balls = state.balls.filter((_, k) => k !== i && k !== j);
-          state.score += TIERS[a.tier].score + spec.score;
-          if (state.score > state.best) {
-            state.best = state.score;
-            localStorage.setItem("synthesis-world-coach-best", String(state.best));
+      pairLoop:
+      for (let i=0; i<state.balls.length; i++) {
+        for (let j=i+1; j<state.balls.length; j++) {
+          const a=state.balls[i], b=state.balls[j];
+          const dx=b.x-a.x, dy=b.y-a.y;
+          const distance=Math.hypot(dx,dy) || 0.001;
+          const minimumDistance=a.r+b.r;
+          if (distance >= minimumDistance) continue;
+
+          collided = true;
+          if (a.tier === b.tier && a.tier < TIERS.length-1) {
+            mergeBalls(a, b, i, j);
+            mergedThisPass = true;
+            break pairLoop;
           }
-          state.pops.push({x, y, r: spec.radius, tier: a.tier + 1, age: 0, text: spec.label});
-          spawnBall(a.tier+1, x, Math.min(y, FLOOR-spec.radius), 0.12);
-          syncHud();
-          return physics(dt);
-        }
 
-        const nx=dx/dist, ny=dy/dist;
-        const overlap=minDist-dist;
-        const ma=a.r*a.r*a.r, mb=b.r*b.r*b.r, total=ma+mb;
-        a.x -= nx*overlap*(mb/total)*0.55;
-        a.y -= ny*overlap*(mb/total)*0.55;
-        b.x += nx*overlap*(ma/total)*0.55;
-        b.y += ny*overlap*(ma/total)*0.55;
-        const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
-        const sep=rvx*nx+rvy*ny;
-        if (sep < 0) {
-          // Equal-and-opposite impulse with 3-D spherical masses; reduced restitution lowers bounce.
-          const e=0.72;
-          const jimp=-(1+e)*sep/(1/ma+1/mb);
-          a.vx -= jimp*nx/ma; a.vy -= jimp*ny/ma;
-          b.vx += jimp*nx/mb; b.vy += jimp*ny/mb;
+          const nx=dx/distance, ny=dy/distance;
+          const ma=a.r*a.r*a.r, mb=b.r*b.r*b.r;
+          const inverseA=1/ma, inverseB=1/mb;
+          const separationWeight=inverseA/(inverseA+inverseB);
+          // Add a tiny separation margin so rounding cannot leave edges touching.
+          const correction=minimumDistance-distance+0.25;
+          a.x -= nx*correction*separationWeight;
+          a.y -= ny*correction*separationWeight;
+          b.x += nx*correction*(1-separationWeight);
+          b.y += ny*correction*(1-separationWeight);
+
+          const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
+          const separationVelocity=rvx*nx+rvy*ny;
+          if (separationVelocity < 0) {
+            // Equal-and-opposite impulse with 3-D spherical masses.
+            const restitution=0.72;
+            const impulse=-(1+restitution)*separationVelocity/(inverseA+inverseB);
+            a.vx -= impulse*nx*inverseA;
+            a.vy -= impulse*ny*inverseA;
+            b.vx += impulse*nx*inverseB;
+            b.vy += impulse*ny*inverseB;
+          }
         }
       }
+
+      for (const ball of state.balls) clampBallToWorld(ball);
+      if (!collided && !mergedThisPass) break;
+    }
+  }
+
+  function startCelebration(tier, x, y) {
+    if (tier === 7) {
+      showMessage("母校建校20周年快乐", 4);
+      launchFireworks(x, y);
+    } else if (tier === 8) {
+      showMessage("永远的高2023级2班", 5);
+    }
+  }
+
+  function showMessage(text, duration) {
+    const existing = state.messages.find(message => message.text === text);
+    if (existing) {
+      existing.age = 0;
+      existing.duration = duration;
+      return;
+    }
+    state.messages.push({ text, duration, age: 0 });
+  }
+
+  function launchFireworks(originX, originY) {
+    const burstCount = state.quality === "low" ? 4 : 6;
+    const centers = [
+      {x: originX, y: originY},
+      {x: W*.25, y: H*.25},
+      {x: W*.75, y: H*.24},
+      {x: W*.50, y: H*.18},
+      {x: W*.18, y: H*.38},
+      {x: W*.82, y: H*.36},
+    ].slice(0, burstCount);
+    const colors = ["#ff477e", "#ffd166", "#06d6a0", "#4cc9f0", "#b5179e"];
+
+    centers.forEach((center, burstIndex) => {
+      const particleCount = state.quality === "low" ? 18 : 30;
+      const delay = burstIndex * 0.18;
+      for (let i=0; i<particleCount; i++) {
+        const angle=(i/particleCount)*Math.PI*2 + Math.random()*.18;
+        const speed=85+Math.random()*145;
+        state.fireworks.push({
+          x: center.x, y: center.y,
+          vx: Math.cos(angle)*speed,
+          vy: Math.sin(angle)*speed,
+          age: -delay,
+          life: 0.85+Math.random()*.45,
+          color: colors[(burstIndex+i)%colors.length]
+        });
+      }
+    });
+  }
+
+  function updateCelebrations(dt) {
+    for (const message of state.messages) message.age += dt;
+    state.messages = state.messages.filter(message => message.age < message.duration);
+
+    for (const particle of state.fireworks) {
+      particle.age += dt;
+      if (particle.age <= 0) continue;
+      particle.x += particle.vx*dt;
+      particle.y += particle.vy*dt;
+      particle.vy += 185*dt;
+      particle.vx *= Math.pow(.50, dt);
+    }
+    state.fireworks = state.fireworks.filter(particle => particle.age < particle.life);
+  }
+
+  function drawCelebrations() {
+    for (const particle of state.fireworks) {
+      if (particle.age <= 0) continue;
+      const lifeRatio=particle.age/particle.life;
+      const alpha=Math.max(0, 1-lifeRatio);
+      ctx.save();
+      ctx.globalAlpha=alpha;
+      ctx.strokeStyle=particle.color;
+      ctx.lineWidth=3;
+      ctx.lineCap="round";
+      ctx.beginPath();
+      ctx.moveTo(particle.x-particle.vx*.035, particle.y-particle.vy*.035);
+      ctx.lineTo(particle.x, particle.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(particle.x,particle.y,2.4,0,Math.PI*2);
+      ctx.fillStyle=particle.color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for (const message of state.messages) {
+      const fadeIn=Math.min(1,message.age/.22);
+      const fadeOut=Math.min(1,Math.max(0,(message.duration-message.age)/.55));
+      const alpha=Math.min(fadeIn,fadeOut);
+      let fontSize=34;
+      ctx.font=`900 ${fontSize}px system-ui,sans-serif`;
+      while (ctx.measureText(message.text).width > W-70 && fontSize>20) {
+        fontSize--;
+        ctx.font=`900 ${fontSize}px system-ui,sans-serif`;
+      }
+      const width=ctx.measureText(message.text).width+34;
+      const height=62;
+      const x=(W-width)/2;
+      const y=160;
+
+      ctx.save();
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle="#fffdf4";
+      ctx.strokeStyle="#1e2350";
+      ctx.lineWidth=4;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x,y,width,height,14) : ctx.rect(x,y,width,height);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle="#d81159";
+      ctx.textAlign="center";
+      ctx.textBaseline="middle";
+      ctx.fillText(message.text,W/2,y+height/2+1);
+      ctx.restore();
     }
   }
 
@@ -580,6 +738,7 @@
     for (const b of state.balls) drawBallShape(b.x,b.y,b.r,TIERS[b.tier].color,TIERS[b.tier].label);
 
     for (const p of state.pops) drawSynthesisPop(p);
+    drawCelebrations();
   }
 
   let last=performance.now();
@@ -590,6 +749,9 @@
       physics(dt);
       updateDanger(dt);
       updatePops(dt);
+      updateCelebrations(dt);
+    } else {
+      updateCelebrations(dt);
     }
     draw();
     requestAnimationFrame(frame);
