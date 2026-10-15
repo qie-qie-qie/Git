@@ -207,7 +207,7 @@
       </div>
     </fieldset>
     <div class="help">
-      鼠标移动瞄准<br>点击 / 下键投放<br>← → 微调位置<br>相同球相碰合成
+      按住拖动瞄准<br>松手释放小球<br>← → / 下键也可操作<br>相同球相碰合成
     </div>
   </aside>
 
@@ -761,15 +761,30 @@
     const rect=canvas.getBoundingClientRect();
     return (event.clientX-rect.left)*(W/rect.width);
   }
+  let aimingPointerId = null;
+  canvas.addEventListener("pointerdown", event => {
+    aimingPointerId = event.pointerId;
+    state.aimX=pointerX(event);
+    if (canvas.hasPointerCapture && !canvas.hasPointerCapture(event.pointerId)) {
+      canvas.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+  }, {passive:false});
   canvas.addEventListener("pointermove", event => {
+    if (aimingPointerId !== null && event.pointerId !== aimingPointerId) return;
     state.aimX=pointerX(event);
     event.preventDefault();
   }, {passive:false});
-  canvas.addEventListener("pointerdown", event => {
+  canvas.addEventListener("pointerup", event => {
+    if (aimingPointerId === null || event.pointerId !== aimingPointerId) return;
+    aimingPointerId = null;
     state.aimX=pointerX(event);
     drop();
     event.preventDefault();
   }, {passive:false});
+  canvas.addEventListener("pointercancel", event => {
+    if (event.pointerId === aimingPointerId) aimingPointerId = null;
+  });
   window.addEventListener("keydown", event => {
     if (!state.running) return;
     if (event.key === "ArrowLeft") { state.aimX -= 20; event.preventDefault(); }
