@@ -217,6 +217,13 @@
   const W = 480, H = 720;
   const LEFT = 18, RIGHT = W - 18, FLOOR = H - 22;
   const DROP_Y = 74, DANGER_Y = 108;
+  // Only the first four tiers spawn; smaller balls are intentionally more common.
+  const DROP_POOL = [
+    { tier: 0, weight: 46 },
+    { tier: 1, weight: 31 },
+    { tier: 2, weight: 16 },
+    { tier: 3, weight: 7 },
+  ];
   const TIERS = [
     { label: "牢", radius: 18, color: "#8ecae6", score: 1 },
     { label: "C",  radius: 25, color: "#90be6d", score: 3 },
@@ -242,7 +249,15 @@
     pops: []
   };
 
-  function randomTier() { return Math.floor(Math.random() * 5); }
+  function randomTier() {
+    const total = DROP_POOL.reduce((sum, item) => sum + item.weight, 0);
+    let roll = Math.random() * total;
+    for (const item of DROP_POOL) {
+      roll -= item.weight;
+      if (roll < 0) return item.tier;
+    }
+    return DROP_POOL[DROP_POOL.length - 1].tier;
+  }
 
   function reset() {
     state.balls = [];
@@ -294,12 +309,12 @@
     setTimeout(() => {
       state.canDrop = true;
       if (state.running) canvas.dispatchEvent(new CustomEvent("game:ready"));
-    }, 420);
+    }, 330);
     syncHud();
   }
 
   function physics(dt) {
-    const g = 1450;
+    const g = 1650;
     const damping = Math.pow(0.21, dt);
     for (const b of state.balls) {
       b.vy += g*dt;
@@ -350,7 +365,7 @@
         const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
         const sep=rvx*nx+rvy*ny;
         if (sep < 0) {
-          const e=0.18;
+          const e=0.14;
           const jimp=-(1+e)*sep/(1/ma+1/mb);
           a.vx -= jimp*nx/ma; a.vy -= jimp*ny/ma;
           b.vx += jimp*nx/mb; b.vy += jimp*ny/mb;
@@ -363,7 +378,7 @@
   function updateDanger(dt) {
     const unsafe = state.balls.some(b => b.age > 0.65 && b.y-b.r < DANGER_Y && Math.abs(b.vy) < 210);
     state.dangerTime = unsafe ? state.dangerTime+dt : Math.max(0, state.dangerTime-dt*1.5);
-    if (state.dangerTime > 2) {
+    if (state.dangerTime > 1.6) {
       state.running = false;
       finalScore.textContent = String(state.score);
       overlay.hidden = false;
