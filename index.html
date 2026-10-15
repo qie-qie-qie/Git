@@ -234,6 +234,10 @@
   const nextEl = document.getElementById("nextBall");
   const overlay = document.getElementById("overlay");
   const finalScore = document.getElementById("finalScore");
+  const tierImages = {
+    AJYC: Object.assign(new Image(), { src: "assets/AJYC.png" }),
+    ZT: Object.assign(new Image(), { src: "assets/ZT.png" }),
+  };
   const qualityControls = document.getElementById("qualityControls");
 
   const W = 480, H = 720;
@@ -459,6 +463,23 @@
     ctx.stroke();
 
     // Flat anime-style cheek accents; no specular highlight or 3-D reflection.
+    const tierImage = tierImages[label];
+    if (tierImage && tierImage.complete && tierImage.naturalWidth) {
+      // Keep custom badges fully flat: circular clipping only, no lighting or reflection.
+      const iconR=r*.76;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x,y,iconR,0,Math.PI*2); ctx.clip();
+      ctx.drawImage(tierImage,x-iconR,y-iconR,iconR*2,iconR*2);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(x,y,iconR,0,Math.PI*2);
+      ctx.lineWidth=Math.max(2,r*.045);
+      ctx.strokeStyle="#ffffff"; ctx.stroke();
+      ctx.lineWidth=1;
+      ctx.strokeStyle="#1e2350"; ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     if (state.quality !== "low" && r >= 25) {
       ctx.beginPath(); ctx.ellipse(x-r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
       ctx.ellipse(x+r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
@@ -604,9 +625,16 @@
   TIERS.forEach((tier,index) => {
     if (index) chain.appendChild(document.createTextNode("→"));
     const item=document.createElement("div");
-    item.textContent=tier.label;
-    item.style.background=tier.color;
-    item.style.color=readableColor(tier.color);
+    if (tierImages[tier.label]) {
+      item.title = tier.label;
+      item.role = "img";
+      item.ariaLabel = tier.label;
+      item.style.background = `#ffffff url("assets/${tier.label}.png") center / cover no-repeat`;
+    } else {
+      item.textContent=tier.label;
+      item.style.background=tier.color;
+      item.style.color=readableColor(tier.color);
+    }
     chain.appendChild(item);
   });
 
