@@ -43,7 +43,6 @@
     font-weight: 900;
     letter-spacing: 1px;
     color: #ffd166;
-    text-shadow: 2px 2px 0 #e5397a;
     white-space: nowrap;
   }
   .stats { display: flex; gap: 7px; }
@@ -366,9 +365,9 @@
       b.x += b.vx*dt;
       b.y += b.vy*dt;
       b.age += dt;
-      if (b.x-b.r < LEFT) { b.x = LEFT+b.r; b.vx = Math.abs(b.vx)*0.24; }
-      if (b.x+b.r > RIGHT) { b.x = RIGHT-b.r; b.vx = -Math.abs(b.vx)*0.24; }
-      if (b.y+b.r > FLOOR) { b.y = FLOOR-b.r; b.vy = -Math.abs(b.vy)*0.12; b.vx *= 0.84; }
+      if (b.x-b.r < LEFT) { b.x = LEFT+b.r; b.vx = Math.abs(b.vx)*0.16; }
+      if (b.x+b.r > RIGHT) { b.x = RIGHT-b.r; b.vx = -Math.abs(b.vx)*0.16; }
+      if (b.y+b.r > FLOOR) { b.y = FLOOR-b.r; b.vy = -Math.abs(b.vy)*0.06; b.vx *= 0.94; }
     }
 
     const merged = new Set();
@@ -394,7 +393,7 @@
             state.best = state.score;
             localStorage.setItem("synthesis-world-coach-best", String(state.best));
           }
-          state.pops.push({x, y, r: spec.radius, age: 0, text: spec.label});
+          state.pops.push({x, y, r: spec.radius, tier: a.tier + 1, age: 0, text: spec.label});
           spawnBall(a.tier+1, x, Math.min(y, FLOOR-spec.radius), 0.12);
           syncHud();
           return physics(dt);
@@ -410,8 +409,8 @@
         const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
         const sep=rvx*nx+rvy*ny;
         if (sep < 0) {
-          // Elastic impulse: equal and opposite momentum changes in a 3-D mass model.
-          const e=1;
+          // Equal-and-opposite impulse with 3-D spherical masses; reduced restitution lowers bounce.
+          const e=0.72;
           const jimp=-(1+e)*sep/(1/ma+1/mb);
           a.vx -= jimp*nx/ma; a.vy -= jimp*ny/ma;
           b.vx += jimp*nx/mb; b.vy += jimp*ny/mb;
@@ -432,7 +431,7 @@
 
   function updatePops(dt) {
     for (const p of state.pops) p.age += dt;
-    state.pops = state.pops.filter(p => p.age < 0.48);
+    state.pops = state.pops.filter(p => p.age < (p.tier >= 5 ? 0.72 : 0.48));
   }
 
   function drawGuide() {
@@ -459,11 +458,7 @@
     ctx.strokeStyle="#1e2350";
     ctx.stroke();
 
-    // Flat anime-style highlight and cheek accents.
-    ctx.beginPath();
-    ctx.arc(x-r*.30,y-r*.34,r*.22,0,Math.PI*2);
-    ctx.fillStyle="rgba(255,255,255,.88)";
-    ctx.fill();
+    // Flat anime-style cheek accents; no specular highlight or 3-D reflection.
     if (state.quality !== "low" && r >= 25) {
       ctx.beginPath(); ctx.ellipse(x-r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
       ctx.ellipse(x+r*.42,y+r*.12,r*.08,r*.05,0,0,Math.PI*2);
@@ -477,6 +472,52 @@
     ctx.strokeStyle="rgba(30,35,80,.28)";
     ctx.strokeText(label,x,y+r*.03);
     ctx.fillText(label,x,y+r*.03);
+    ctx.restore();
+  }
+
+  function drawSynthesisPop(p) {
+    const large = p.tier >= 5;
+    const duration = large ? .72 : .48;
+    const t = Math.min(1, p.age/duration);
+    const fade = 1-t;
+    ctx.save();
+    ctx.globalAlpha=fade;
+    ctx.textAlign="center";
+    ctx.lineCap="round";
+
+    // Main burst.
+    ctx.strokeStyle="#d81159";
+    ctx.lineWidth=(large ? 8 : 5)*fade+1;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(.55+t*(large ? 1.15 : .70)),0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle="#1e2350";
+    ctx.lineWidth=1;
+    ctx.stroke();
+
+    if (large) {
+      // Larger balls receive a stronger two-dimensional anime burst.
+      ctx.strokeStyle="#ffb703";
+      ctx.lineWidth=5*fade+1;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(.35+t*.82),0,Math.PI*2); ctx.stroke();
+
+      if (state.quality !== "low") {
+        const rays = p.tier >= 7 ? 12 : 8;
+        const inner = p.r*(.72+t*.32);
+        const outer = p.r*(1.05+t*.55);
+        ctx.strokeStyle="#1e2350";
+        ctx.lineWidth=4*fade+1;
+        for (let i=0; i<rays; i++) {
+          const angle=(i/rays)*Math.PI*2 + t*.65;
+          ctx.beginPath();
+          ctx.moveTo(p.x+Math.cos(angle)*inner,p.y+Math.sin(angle)*inner);
+          ctx.lineTo(p.x+Math.cos(angle)*outer,p.y+Math.sin(angle)*outer);
+          ctx.stroke();
+        }
+      }
+    }
+
+    ctx.fillStyle=large ? "#d81159" : "#1e2350";
+    ctx.font=`900 ${large ? 24 : 16}px system-ui,sans-serif`;
+    ctx.fillText(p.text,p.x,p.y-p.r*(.72+t*(large ? .82 : .60)));
     ctx.restore();
   }
 
@@ -517,22 +558,7 @@
     if (state.running && state.canDrop) drawGuide();
     for (const b of state.balls) drawBallShape(b.x,b.y,b.r,TIERS[b.tier].color,TIERS[b.tier].label);
 
-    if (state.quality === "low") return;
-    for (const p of state.pops) {
-      const t=p.age/.48;
-      ctx.save();
-      ctx.globalAlpha=1-t;
-      ctx.strokeStyle="#d81159";
-      ctx.lineWidth=5*(1-t)+1;
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(.6+t*.7),0,Math.PI*2); ctx.stroke();
-      ctx.strokeStyle="#1e2350";
-      ctx.lineWidth=1;
-      ctx.stroke();
-      ctx.fillStyle="#1e2350";
-      ctx.font="900 16px system-ui,sans-serif"; ctx.textAlign="center";
-      ctx.fillText(p.text,p.x,p.y-p.r*(.7+t*.6));
-      ctx.restore();
-    }
+    for (const p of state.pops) drawSynthesisPop(p);
   }
 
   let last=performance.now();
