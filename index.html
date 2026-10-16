@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>合成世一师</title>
+<title>合成世一班</title>
 <meta name="description" content="把相同的小球合成更高等级，从「牢」一路合成到 ZT！">
 <style>
   :root {
@@ -147,31 +147,6 @@
   .overlay h2 { margin: 0; font-size: 26px; color: #e5397a; }
   .overlay p { margin: -5px 0 0; color: #48518a; }
   .overlay strong { color: #d81159; }
-  .chain {
-    width: min(100%, 480px);
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 3px;
-    color: var(--muted);
-    font-size: 11px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-  .chain div {
-    flex: 0 0 auto;
-    width: 29px;
-    height: 29px;
-    border: 2px solid #1e2350;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    color: #1e2350;
-    font-weight: 900;
-    font-size: 9px;
-  }
-  .chain i { flex: 0 0 auto; font-style: normal; }
   footer { margin-top: 8px; color: #9aa4e0; font-size: 10px; text-align: center; }
   @media (max-width: 400px) {
     main { grid-template-columns: 1fr; }
@@ -185,7 +160,7 @@
 </head>
 <body>
 <header>
-  <h1>合成世一师</h1>
+  <h1>合成世一班</h1>
   <div class="stats" aria-label="分数与最高分">
     <div class="score-box"><span>分数</span><strong id="score">0</strong></div>
     <div class="score-box"><span>最高</span><strong id="best">0</strong></div>
@@ -212,7 +187,7 @@
   </aside>
 
   <div class="stage-shell">
-    <canvas id="game" width="480" height="720" role="application" aria-label="合成世一师游戏区域"></canvas>
+    <canvas id="game" width="480" height="720" role="application" aria-label="合成世一班游戏区域"></canvas>
     <div id="overlay" class="overlay" hidden>
       <h2 id="overTitle">游戏结束</h2>
       <p>本局得分 <strong id="finalScore">0</strong></p>
@@ -221,8 +196,7 @@
   </div>
 </main>
 
-<div class="chain" id="chain" aria-label="合成路线"></div>
-<footer>两颗同级球合成下一级 · 世一师宇宙特别版</footer>
+<footer>两颗同级球合成下一级 · 世一班宇宙特别版</footer>
 
 <script>
 (() => {
@@ -798,22 +772,7 @@
   document.getElementById("restart").addEventListener("click", reset);
   document.getElementById("overlayRestart").addEventListener("click", reset);
 
-  const chain=document.getElementById("chain");
-  TIERS.forEach((tier,index) => {
-    if (index) chain.appendChild(document.createTextNode("→"));
-    const item=document.createElement("div");
-    if (tierImages[tier.label]) {
-      item.title = tier.label;
-      item.role = "img";
-      item.ariaLabel = tier.label;
-      item.style.background = `#ffffff url("assets/${tier.label}.png") center / cover no-repeat`;
-    } else {
-      item.textContent=tier.label;
-      item.style.background=tier.color;
-      item.style.color=readableColor(tier.color);
-    }
-    chain.appendChild(item);
-  });
+
 
   reset();
   requestAnimationFrame(frame);
