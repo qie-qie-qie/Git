@@ -68,7 +68,7 @@
   }
   .side {
     display: grid;
-    grid-template-columns: minmax(104px, auto) minmax(88px, auto);
+    grid-template-columns: minmax(100px, auto) repeat(3, minmax(54px, auto));
     justify-content: center;
     align-items: center;
     gap: 6px;
@@ -124,6 +124,60 @@
   .overlay strong { color: #d81159; }
   footer { margin-top: 3px; color: #9aa4e0; font-size: 9px; text-align: center; }
 
+  .account-overlay, .board-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    padding: 14px;
+    background: #0b0f22e8;
+  }
+  .account-overlay[hidden], .board-overlay[hidden] { display: none; }
+  .account-card, .board-card {
+    width: min(94vw, 390px);
+    max-height: min(86dvh, 620px);
+    overflow: auto;
+    padding: 16px;
+    border: 4px solid #1e2350;
+    border-radius: 16px;
+    background: #fffdf4;
+    color: #1e2350;
+    box-shadow: 0 12px 0 #101632;
+  }
+  .account-card form, .board-card div { display: grid; gap: 9px; }
+  .account-card h2, .board-card h2 { margin: 0; font-size: 23px; color: #d81159; }
+  .account-card label, .board-card p { margin: 0; color: #48518a; font-size: 12px; }
+  .account-card input {
+    width: 100%;
+    padding: 10px;
+    border: 3px solid #1e2350;
+    border-radius: 10px;
+    font: 800 16px inherit;
+    color: #1e2350;
+    background: white;
+  }
+  .account-card input:focus, button:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+  .account-note { min-height: 17px; color: #d81159; font-size: 12px; font-weight: 800; }
+  .board-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .board-list li {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 7px;
+    align-items: center;
+    padding: 6px 7px;
+    border: 2px solid #d9d5ef;
+    border-radius: 8px;
+    background: white;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .board-list li.me { border-color: #d81159; background: #fff0f5; color: #d81159; }
+  .board-list .rank { color: #48518a; font-variant-numeric: tabular-nums; }
+  .board-list .score { font-variant-numeric: tabular-nums; }
+  .board-status { min-height: 16px; color: #48518a; font-size: 11px; }
+  .secondary-button { background: #e9e5ff; color: #1e2350; }
+
 </style>
 </head>
 <body>
@@ -140,7 +194,9 @@
     <div class="next" aria-label="下一颗小球">
       <span>下一颗</span><div id="nextBall" class="ball-preview" aria-hidden="true"></div>
     </div>
+    <button id="leaderboard" type="button">排行</button>
     <button id="restart" type="button">重开</button>
+    <button id="logout" type="button" class="secondary-button">退出</button>
   </aside>
 
   <div class="stage-shell">
@@ -155,6 +211,29 @@
 
 <footer>两颗同级球合成下一级 · 世一班宇宙特别版</footer>
 
+<div id="loginOverlay" class="account-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <section class="account-card">
+    <form id="loginForm">
+      <h2 id="loginTitle">账号登录</h2>
+      <label for="usernameInput">请输入老师预先设置的账号名</label>
+      <input id="usernameInput" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" required>
+      <button id="loginButton" type="submit">登录游戏</button>
+      <div id="loginMessage" class="account-note" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+</div>
+
+<div id="boardOverlay" class="board-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="boardTitle">
+  <section class="board-card">
+    <div>
+      <h2 id="boardTitle">积分排行榜</h2>
+      <div id="boardStatus" class="board-status" role="status" aria-live="polite">加载中…</div>
+      <ol id="boardList" class="board-list"></ol>
+      <button id="boardClose" type="button" class="secondary-button">关闭</button>
+    </div>
+  </section>
+</div>
+
 <script>
 (() => {
   "use strict";
@@ -165,6 +244,20 @@
   const nextEl = document.getElementById("nextBall");
   const overlay = document.getElementById("overlay");
   const finalScore = document.getElementById("finalScore");
+  const loginOverlay = document.getElementById("loginOverlay");
+  const loginForm = document.getElementById("loginForm");
+  const usernameInput = document.getElementById("usernameInput");
+  const loginButton = document.getElementById("loginButton");
+  const loginMessage = document.getElementById("loginMessage");
+  const boardOverlay = document.getElementById("boardOverlay");
+  const boardStatus = document.getElementById("boardStatus");
+  const boardList = document.getElementById("boardList");
+  const boardClose = document.getElementById("boardClose");
+  const leaderboardButton = document.getElementById("leaderboard");
+  const logoutButton = document.getElementById("logout");
+  const SUPABASE_URL = "https://qvvocizlcsfufmjclngq.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_udDHJ6wePMfSM7GwoqNTYA_A4GrBsMz";
+  const SESSION_STORAGE_KEY = "synthesis-world-class-session-v1";
   const tierImages = {
     AJYC: Object.assign(new Image(), { src: "assets/AJYC.png" }),
     ZT: Object.assign(new Image(), { src: "assets/ZT.png" }),
@@ -199,8 +292,12 @@
     current: randomTier(),
     next: randomTier(),
     score: 0,
-    best: Number(localStorage.getItem("synthesis-world-coach-best") || 0),
-    running: true,
+    best: 0,
+    running: false,
+    loggedIn: false,
+    sessionToken: null,
+    username: null,
+    scoreSubmitted: false,
     canDrop: true,
     dangerTime: 0,
     elapsed: 0,
@@ -238,6 +335,7 @@
     state.canDrop = true;
     state.dangerTime = 0;
     state.elapsed = 0;
+    state.scoreSubmitted = false;
     overlay.hidden = true;
     syncHud();
     configureCanvasQuality();
@@ -269,7 +367,7 @@
   }
 
   function drop() {
-    if (!state.running || !state.canDrop) return;
+    if (!state.running || !state.loggedIn || !state.canDrop) return;
     const r = TIERS[state.current].radius;
     const x = Math.min(RIGHT-r, Math.max(LEFT+r, state.aimX));
     spawnBall(state.current, x, DROP_Y);
@@ -296,10 +394,7 @@
     const y = (a.y*massA+b.y*massB)/(massA+massB);
     state.balls = state.balls.filter((_, index) => index !== indexA && index !== indexB);
     state.score += TIERS[a.tier].score + spec.score;
-    if (state.score > state.best) {
-      state.best = state.score;
-      localStorage.setItem("synthesis-world-coach-best", String(state.best));
-    }
+    if (state.score > state.best) state.best = state.score;
     state.pops.push({x, y, r: spec.radius, tier: a.tier + 1, age: 0, text: spec.label});
     const spawned = {
       tier: a.tier + 1, x, y, vx: 0, vy: 0,
@@ -379,6 +474,154 @@
       for (const ball of state.balls) clampBallToWorld(ball);
       if (!collided && !mergedThisPass) break;
     }
+  }
+
+  async function supabaseRpc(functionName, payload) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const message = data?.message || data?.error || "请求失败，请稍后再试";
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  function showLogin(message="") {
+    state.loggedIn = false;
+    state.running = false;
+    state.sessionToken = null;
+    state.username = null;
+    state.best = 0;
+    state.balls = [];
+    state.pops = [];
+    state.messages = [];
+    state.fireworks = [];
+    state.score = 0;
+    state.dangerTime = 0;
+    loginMessage.textContent = message;
+    loginOverlay.hidden = false;
+    boardOverlay.hidden = true;
+    overlay.hidden = true;
+    syncHud();
+    usernameInput.focus();
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    const username = usernameInput.value.trim().toLowerCase();
+    loginMessage.textContent = "";
+    if (!username) {
+      loginMessage.textContent = "请输入账号名";
+      return;
+    }
+    loginButton.disabled = true;
+    loginButton.textContent = "登录中…";
+    try {
+      const token = await supabaseRpc("game_login", { p_username: username });
+      state.sessionToken = token;
+      localStorage.setItem(SESSION_STORAGE_KEY, token);
+      const session = await supabaseRpc("game_session", { p_token: token });
+      applySession(session);
+      loginOverlay.hidden = true;
+      reset();
+    } catch (error) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      loginMessage.textContent = error.message === "account not allowed"
+        ? "这个账号名不在允许列表中"
+        : (error.message || "登录失败，请稍后再试");
+    } finally {
+      loginButton.disabled = false;
+      loginButton.textContent = "登录游戏";
+    }
+  }
+
+  function applySession(session) {
+    if (!session) throw new Error("session expired");
+    state.loggedIn = true;
+    state.username = session.username;
+    state.best = Number(session.bestScore || 0);
+    state.sessionToken = localStorage.getItem(SESSION_STORAGE_KEY);
+    syncHud();
+  }
+
+  async function restoreSession() {
+    const token = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!token) {
+      showLogin();
+      return;
+    }
+    try {
+      const session = await supabaseRpc("game_session", { p_token: token });
+      applySession(session);
+      reset();
+    } catch {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      showLogin("登录已过期，请重新输入账号名");
+    }
+  }
+
+  async function submitCurrentScore() {
+    if (!state.sessionToken) return;
+    try {
+      const result = await supabaseRpc("game_submit_score", {
+        p_token: state.sessionToken,
+        p_score: state.score
+      });
+      state.best = Number(result.bestScore || state.best);
+      syncHud();
+    } catch {
+      state.scoreSubmitted = false;
+    }
+  }
+
+  function renderLeaderboard(entries) {
+    boardList.replaceChildren();
+    for (const entry of entries) {
+      const item=document.createElement("li");
+      if (entry.username === state.username) item.className="me";
+      const rank=document.createElement("span");
+      rank.className="rank"; rank.textContent=`#${entry.rank}`;
+      const name=document.createElement("span");
+      name.textContent=entry.username;
+      const score=document.createElement("span");
+      score.className="score"; score.textContent=String(entry.bestScore);
+      item.append(rank,name,score);
+      boardList.appendChild(item);
+    }
+  }
+
+  async function showLeaderboard() {
+    boardOverlay.hidden = false;
+    boardStatus.textContent = "加载中…";
+    boardList.replaceChildren();
+    try {
+      const entries = await supabaseRpc("game_leaderboard", {});
+      renderLeaderboard(entries);
+      boardStatus.textContent = `共 ${entries.length} 个账号`;
+    } catch (error) {
+      boardStatus.textContent = error.message || "排行榜加载失败";
+    }
+  }
+
+  async function handleLogout() {
+    if (!state.sessionToken) {
+      showLogin();
+      return;
+    }
+    try { await supabaseRpc("game_logout", { p_token: state.sessionToken }); }
+    catch { /* Logout locally even if the network request fails. */ }
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    usernameInput.value = "";
+    showLogin();
   }
 
   function startCelebration(tier, x, y) {
@@ -505,6 +748,10 @@
       state.running = false;
       finalScore.textContent = String(state.score);
       overlay.hidden = false;
+      if (!state.scoreSubmitted) {
+        state.scoreSubmitted = true;
+        submitCurrentScore();
+      }
     }
   }
 
@@ -702,8 +949,15 @@
   canvas.addEventListener("pointercancel", event => {
     if (event.pointerId === aimingPointerId) aimingPointerId = null;
   });
+  loginForm.addEventListener("submit", handleLogin);
+  leaderboardButton.addEventListener("click", showLeaderboard);
+  boardClose.addEventListener("click", () => { boardOverlay.hidden = true; });
+  boardOverlay.addEventListener("click", event => {
+    if (event.target === boardOverlay) boardOverlay.hidden = true;
+  });
+  logoutButton.addEventListener("click", handleLogout);
   window.addEventListener("keydown", event => {
-    if (!state.running) return;
+    if (!state.running || !loginOverlay.hidden) return;
     if (event.key === "ArrowLeft") { state.aimX -= 20; event.preventDefault(); }
     if (event.key === "ArrowRight") { state.aimX += 20; event.preventDefault(); }
     if (event.key === "ArrowDown" || event.key === " ") { drop(); event.preventDefault(); }
@@ -713,7 +967,9 @@
 
 
 
-  reset();
+  configureCanvasQuality();
+  syncHud();
+  restoreSession();
   requestAnimationFrame(frame);
 })();
 </script>
