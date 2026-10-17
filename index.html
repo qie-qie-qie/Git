@@ -407,14 +407,10 @@
   }
 
   function physics(dt) {
-    // A stronger gravitational acceleration keeps drops responsive, while the
-    // terminal velocity cap prevents fast balls from destabilizing dense stacks.
-    const g = 2300;
-    const terminalVelocity = 2600;
+    const g = 1650;
     const damping = Math.pow(0.21, dt);
     for (const ball of state.balls) {
       ball.vy += g*dt;
-      if (ball.vy > terminalVelocity) ball.vy = terminalVelocity;
       ball.vx *= damping;
       ball.x += ball.vx*dt;
       ball.y += ball.vy*dt;
@@ -428,9 +424,9 @@
       }
     }
 
-    // Gradual relaxation resolves dense stacks without the jitter caused by
-    // applying a full positional correction every frame.
-    for (let pass=0; pass<6; pass++) {
+    // Multiple relaxation passes keep dense stacks from visually overlapping.
+    // Each pass fully separates a colliding pair according to inverse mass.
+    for (let pass=0; pass<8; pass++) {
       let collided = false;
       let mergedThisPass = false;
 
@@ -454,7 +450,8 @@
           const ma=a.r*a.r*a.r, mb=b.r*b.r*b.r;
           const inverseA=1/ma, inverseB=1/mb;
           const separationWeight=inverseA/(inverseA+inverseB);
-          const correction=(minimumDistance-distance)*0.82;
+          // Add a tiny separation margin so rounding cannot leave edges touching.
+          const correction=minimumDistance-distance+0.25;
           a.x -= nx*correction*separationWeight;
           a.y -= ny*correction*separationWeight;
           b.x += nx*correction*(1-separationWeight);
@@ -464,8 +461,7 @@
           const separationVelocity=rvx*nx+rvy*ny;
           if (separationVelocity < 0) {
             // Equal-and-opposite impulse with 3-D spherical masses.
-            // Low-speed contacts use zero restitution to suppress micro-shaking.
-            const restitution=separationVelocity < -45 ? 0.38 : 0;
+            const restitution=0.72;
             const impulse=-(1+restitution)*separationVelocity/(inverseA+inverseB);
             a.vx -= impulse*nx*inverseA;
             a.vy -= impulse*ny*inverseA;
@@ -475,11 +471,7 @@
         }
       }
 
-      for (const ball of state.balls) {
-        clampBallToWorld(ball);
-        if (Math.abs(ball.vx) < 5) ball.vx=0;
-        if (Math.abs(ball.vy) < 18) ball.vy=0;
-      }
+      for (const ball of state.balls) clampBallToWorld(ball);
       if (!collided && !mergedThisPass) break;
     }
   }
@@ -918,9 +910,7 @@
     const dt=Math.min(.033,(now-last)/1000); last=now;
     if (state.running) {
       state.elapsed += dt;
-      // Two deterministic sub-steps reduce penetration and visible shaking.
-      physics(dt/2);
-      physics(dt/2);
+      physics(dt);
       updateDanger(dt);
       updatePops(dt);
       updateCelebrations(dt);
