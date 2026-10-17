@@ -407,10 +407,14 @@
   }
 
   function physics(dt) {
-    const g = 1650;
+    // A stronger gravitational acceleration keeps drops responsive, while the
+    // terminal velocity cap prevents fast balls from destabilizing dense stacks.
+    const g = 2300;
+    const terminalVelocity = 2600;
     const damping = Math.pow(0.21, dt);
     for (const ball of state.balls) {
       ball.vy += g*dt;
+      if (ball.vy > terminalVelocity) ball.vy = terminalVelocity;
       ball.vx *= damping;
       ball.x += ball.vx*dt;
       ball.y += ball.vy*dt;
